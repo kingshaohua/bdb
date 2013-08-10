@@ -49,4 +49,12 @@ LIBTP的实现和BDB 2.0的设计最大的不同就是移除了process manager�
 第四， 日志子系统的API目前是基于游标的（去除了log_get API,替换成了log_cursor API)。在历史上，BDB在任意时刻都不会有超过一个线程来读写日志，所以该库中有一个指向当前日志的指针。这不是一个很好的抽象，如果带上replication 就没法工作了。正如应用API使用游标支持迭代器，日志目前使用游标来迭代。第五，fileop模块内含的访问接口提供了事务性从保证了数据库的create,delete,rename操作。我们尝试多种方案来优雅的实现它（它仍没有我想象中那么干净），在对它重构了很长一段时间后，我们将它从模块中抽离出来。
 
 **Design Lesson 2**
+软件设计是几种能让你尝试解决问题之前对其完整思考的方法之一。有经验的程序员会采用一些不同的技巧来完成设计：有些人会写出一个版本，然后丢弃它，有些人会写一些使用手册或者设计文档，others fill out a code template where every requirement is identified and assigned to a specific function or comment. 比如，对于BDB，在写代码之前，我们创建了一系列的Unix-style的使用手册，关于访问接口和组件。无论使用哪种技术，在调试代码之前，很难考虑清楚程序的架构到底是什么样的，更不用说，当架构发生大的变更时，之前的调试工作就白费了。Software architecture requires a different mind set from debugging code, and the architecture you have when you begin debugging is usually the architecture you'll deliver in that release. 
 
+[./img/fig4.4.png](./img/fig4.4.png)
+
+[./img/table1.1.png](./img/table1.1.png)
+[./img/table1.2.png](./img/table1.2.png)
+[./img/table1.3.png](./img/table1.3.png)
+[./img/table1.4.png](./img/table1.4.png)
+[./img/table1.5.png](./img/table1.5.png)
