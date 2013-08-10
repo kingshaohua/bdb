@@ -51,10 +51,33 @@ LIBTP的实现和BDB 2.0的设计最大的不同就是移除了process manager�
 **Design Lesson 2**
 软件设计是几种能让你尝试解决问题之前对其完整思考的方法之一。有经验的程序员会采用一些不同的技巧来完成设计：有些人会写出一个版本，然后丢弃它，有些人会写一些使用手册或者设计文档，others fill out a code template where every requirement is identified and assigned to a specific function or comment. 比如，对于BDB，在写代码之前，我们创建了一系列的Unix-style的使用手册，关于访问接口和组件。无论使用哪种技术，在调试代码之前，很难考虑清楚程序的架构到底是什么样的，更不用说，当架构发生大的变更时，之前的调试工作就白费了。Software architecture requires a different mind set from debugging code, and the architecture you have when you begin debugging is usually the architecture you'll deliver in that release. 
 
-[./img/fig4.4.png](./img/fig4.4.png)
 
-[./img/table1.1.png](./img/table1.1.png)
-[./img/table1.2.png](./img/table1.2.png)
-[./img/table1.3.png](./img/table1.3.png)
-[./img/table1.4.png](./img/table1.4.png)
-[./img/table1.5.png](./img/table1.5.png)
+![](./img/fig4.4.png)
+
+![](./img/table1.1.png)
+![](./img/table1.2.png)
+![](./img/table1.3.png)
+![](./img/table1.4.png)
+![](./img/table1.5.png)
+
+为何将事务库从组件中抽离出来，而不是像当初那样作为单一的用途？对于此问题有三种解释：  
+1、它迫使一个更为严谨的设计。  
+2、如果代码中没有较强的边界，软件包将欲将复杂最后沦为一坨意大利面条。  
+3、你无法预料到所有用户的使用行为，如果你让用户可以访问软件组件，他们会用你从没想到的方式使用他们。  
+在下面的章节，我们会讨论BDB的每一个组件，了解这个组件是做什么的，并在整个架构中如何发挥作用的。  
+
+**3. The Access Methods: Btree, Hash, Recno, Queue**  
+BDB的访问接口提供key值查找，迭代访问，变长和定长字节串。BTree和Hash支持变长key/value对。Recno和Queue支持记录号/值 对（Recno支持变长数据，Queue只支持定长数据）。  
+
+Btree AM和Hash AM 最大的不同就是BTree支持key的局部引用，hash并不支持。这意味着，Btree成为访问数据集的首选，然而，Hash AM适用于数据集大到BTree索引都无法装入内存的情况。此时，将数据加载到内存就比加载索引到内存要好。在1990年，这种折衷意义很大，当时内存比现在要小的多。  
+
+Recno和Queue的不同在于，Queue支持记录级的锁，代价就是只能支持定长数据。Recno支持变长对象，和Btree，Hash，一样，只支持页级锁。  
+
+我们之前是如此设计BDB的：CRUD（create，read，update，delete）是基于key的，并且作为应用程序的首选。我们后续添加游标来支持迭代。我们这做导致库中有很多混乱的无用的重复的代码。随着时间推移，这变的越来越不可维护，然后我们将所有的key操作都变成游标操作（现在对key操作分配了一个缓存游标，执行操作，然后将游标归还给游标缓存池）。这是软件开发中的一个重述过无数次的规则：不要以任何会影响清晰性和简洁性的方式来优化代码，除非你确定必须要这么做。  
+
+**Design Lesson 3**  
+Software architecture does not age gracefully。软件架构的降级和对软件的修改量成正比：bug fixes corrode the layering and new features stress design。很难去判断当软件架构哦降级到何种程度，你就需要重新设计或者重写。一方面，随着架构的降级，维护和开发将变的越来越困难，结果就是对于这块遗留代码，每次发布的时候，都需要一堆人对其无脑测试，因为没人了解其内部是如何工作的。在另一个方面，用户会抱怨由于底层的变更所带来的不稳定性和不兼容性。作为一个软件架构师，你只能确保一件事：无论你怎么做，总会有人会抱怨你。  
+
+我们没有详细讨论BDB AM的详细实现，他们是用耳熟能详的BTree和Hash算法实现的（Recno是在Btree加了一层，而Queue实现了一个文件块查找功能，复杂在增加了记录锁功能）  
+
+
