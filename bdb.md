@@ -236,13 +236,13 @@ BDB需要重建日志文件ID和实际的数据库之间的映射。这样它就
 
 当恢复开始时，事务组件使用日志组件的cached_ckp_lsn值来确定日志的最后一个checkpoint记录的位置。这个记录包含了checkpoint LSN。BDB需要从checkpoint LSN开始恢复，但是为了能这么做，他就需要重建在checkpoint时刻的日志文件ID的映射，而这一信息是存于checkpoint LSN之前的记录中。因此BDB需要查找最后一个checkpoint之前的日志。checkpoint记录中不仅仅包含checkpoint LSN，也包含了之前一个checkpoint LSN，以便这些处理。恢复起始于最近一次的checkpoint，并使用pre_lsn字段，向后遍历日志知道找到在这个checkpoint LSN之前的checkpoint记录。算法如下：  
 
-ckp_record = read (cached_ckp_lsn)
-ckp_lsn = ckp_record.checkpoint_lsn
-cur_lsn = ckp_record.my_lsn
-while (cur_lsn > ckp_lsn) {
-ckp_record = read (ckp_record.prev_ckp)
-cur_lsn = ckp_record.my_lsn
-}  
+	ckp_record = read (cached_ckp_lsn)
+	ckp_lsn = ckp_record.checkpoint_lsn
+	cur_lsn = ckp_record.my_lsn
+	while (cur_lsn > ckp_lsn) {
+		ckp_record = read (ckp_record.prev_ckp)
+		cur_lsn = ckp_record.my_lsn
+	}  
 
 用这个算法挑选出的checkpoint开始，recovery顺序读取日志文件，并重建日志文件ID映射。当它读完所有日志时，这个映射应该和系统停止时的的映射完全一致。同样在这次遍历的是，recovery跟踪每一个事物的提交记录，记下这些事务标识。任何一个出现在日志中的事务，但是没有提交日志记录的都认为是中止的或者根本没有完成的（都被认为是中止的）。当recovery读完日志后，它掉头开始回溯日志。对于遇到的每个事务日志记录，它抽离出事务标识，并判断这个事务是否已经提交，继而判定这条记录是否要undo。如果它发现这个事务标识并不是已提交的事务，它会抽出记录类型并调用recovery例程来处理这个记录，直接undo这个操作。如果这条记录属于已提交的事务，recovery在这次回溯遍历中会忽略她。回溯遍历直到checkpoint LSN。最后，recovery最后一次向前遍历日志，这一次会redo所有已提交的事务日志记录。当最后一个遍历完成是，recovery执行了checkpoint。在这一时刻，数据库是完全一致的，并且可以运行应用了。  
 
